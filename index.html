@@ -1,93 +1,130 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <style>
-      body { margin: 0; }
-      canvas { border: 1px solid black; }
-    </style>
-  </head>
-  <body>
-    <button id="erase">Enable Erase</button>
-    <input type="color" id="color">
-    <input type="range" id="thickness" min="1" max="10" value="1">
-    <button id="clear">Clear</button>
-    <button id="save">Save</button>
-    <canvas id="canvas"></canvas>
+ <head>
+ <style>
+ body { margin: 0; }
+ canvas { border: 1px solid black; }
+ </style>
+ </head>
+ <body>
+ <button id="undo">Undo</button>
+ <button id="redo">Redo</button>
+ <button id="erase">Enable Erase</button>
+ <input type="color" id="color">
+ <input type="range" id="thickness" min="1" max="20" value="1">
+ <button id="clear">Clear</button>
+ <button id="save">Save</button>
+ <canvas id="canvas"></canvas>
 
-    <script>
-      var canvas = document.getElementById('canvas');
-      var ctx = canvas.getContext('2d');
-      var isDrawing = false;
-      var lastX = 0;
-      var lastY = 0;
-      var isErasing = false;
+ <script>
+ var canvas = document.getElementById('canvas');
+ var ctx = canvas.getContext('2d');
+ var isDrawing = false;
+ var lastX = 0;
+ var lastY = 0;
+ var isErasing = false;
+ var undoStack = [];
+ var redoStack = [];
 
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+ canvas.width = window.innerWidth;
+ canvas.height = window.innerHeight;
 
-      function getMousePos(canvas, evt) {
-        var rect = canvas.getBoundingClientRect();
-        return {
-          x: evt.clientX - rect.left,
-          y: evt.clientY - rect.top
-        };
-      }
+ function getMousePos(canvas, evt) {
+ var rect = canvas.getBoundingClientRect();
+ return {
+ x: evt.clientX - rect.left,
+ y: evt.clientY - rect.top
+ };
+ }
 
-      canvas.addEventListener('mousedown', function(e) {
-        isDrawing = true;
-        var mousePos = getMousePos(canvas, e);
-        lastX = mousePos.x;
-        lastY = mousePos.y;
-      });
+ canvas.addEventListener('mousedown', function(e) {
+ isDrawing = true;
+ var mousePos = getMousePos(canvas, e);
+ lastX = mousePos.x;
+ lastY = mousePos.y;
+ });
 
-      canvas.addEventListener('mousemove', function(e) {
-        if (isDrawing) {
-          var mousePos = getMousePos(canvas, e);
-          ctx.beginPath();
-          ctx.moveTo(lastX, lastY);
-          ctx.lineTo(mousePos.x, mousePos.y);
-          ctx.stroke();
-          lastX = mousePos.x;
-          lastY = mousePos.y;
-        }
-      });
+ canvas.addEventListener('mousemove', function(e) {
+ if (isDrawing) {
+ var mousePos = getMousePos(canvas, e);
+ ctx.beginPath();
+ ctx.moveTo(lastX, lastY);
+ ctx.lineTo(mousePos.x, mousePos.y);
+ ctx.stroke();
+ lastX = mousePos.x;
+ lastY = mousePos.y;
 
-      canvas.addEventListener('mouseup', function() {
-        isDrawing = false;
-      });
+ // Add current state to undo stack
+ undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
 
-      document.getElementById('erase').addEventListener('click', function() {
-        isErasing = !isErasing;
-        if (isErasing) {
-          ctx.strokeStyle = 'white';
-          this.textContent = 'Disable Erase';
-        } else {
-          ctx.strokeStyle = document.getElementById('color').value;
-          this.textContent = 'Enable Erase';
-        }
-      });
+ // Clear redo stack
+ redoStack.length = 0;
+ }
+ });
 
-      document.getElementById('color').addEventListener('input', function() {
-        if (!isErasing) {
-          ctx.strokeStyle = this.value;
-        }
-      });
+ canvas.addEventListener('mouseup', function() {
+ isDrawing = false;
+ });
 
-      document.getElementById('thickness').addEventListener('input', function() {
-        ctx.lineWidth = this.value;
-      });
+ document.getElementById('undo').addEventListener('click', function() {
+ if (undoStack.length > 1) {
+ // Save current state to redo stack
+ redoStack.push(undoStack.pop());
 
-      document.getElementById('clear').addEventListener('click', function() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      });
+ // Restore previous state from undo stack
+ ctx.putImageData(undoStack[undoStack.length - 1], 0, 0);
+ }
+ });
 
-      document.getElementById('save').addEventListener('click', function() {
-        var dataURL = canvas.toDataURL();
-        var a = document.createElement('a');
-        a.href = dataURL;
-        a.download = 'drawing.png';
-        a.click();
-      });
-    </script>
-  </body>
+ document.getElementById('redo').addEventListener('click', function() {
+ if (redoStack.length > 0) {
+ // Restore next state from redo stack
+ ctx.putImageData(redoStack.pop(), 0, 0);
+
+ // Add current state to undo stack
+ undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+ }
+ });
+
+ document.getElementById('erase').addEventListener('click', function() {
+ isErasing = !isErasing;
+ if (isErasing) {
+ ctx.strokeStyle = 'white';
+ this.textContent = 'Disable Erase';
+ } else {
+ ctx.strokeStyle = document.getElementById('color').value;
+ this.textContent = 'Enable Erase';
+ }
+ });
+
+ document.getElementById('color').addEventListener('input', function() {
+ if (!isErasing) {
+ ctx.strokeStyle = this.value;
+ }
+ });
+
+ document.getElementById('thickness').addEventListener('input', function() {
+ ctx.lineWidth = this.value;
+ });
+
+ document.getElementById('clear').addEventListener('click', function() {
+ ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+ // Clear undo and redo stacks
+ undoStack.length = 0;
+ redoStack.length = 0;
+
+ // Add initial state to undo stack
+ undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+ });
+
+ document.getElementById('save').addEventListener('click', function() {
+ var dataURL = canvas.toDataURL();
+ var a = document.createElement('a');
+ a.href = dataURL;
+ a.download = 'drawing.png';
+ a.click();
+ });
+ </script>
+ </body>
 </html>
